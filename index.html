@@ -6297,7 +6297,7 @@ function openMember(id){
       &lt;/select>&lt;/div>
     &lt;div class="note" id="roleHint" style="margin:0 0 10px">&lt;/div>
     &lt;div class="field">&lt;label>মোবাইল নম্বর (ইচ্ছা হলে)&lt;/label>&lt;input id="tmPhone" inputmode="tel" value="${esc(m.phone)}" placeholder="০১৭xxxxxxxx">&lt;/div>
-    &lt;div class="field">&lt;label>Google মেইল (ইচ্ছা হলে — পরে ক্লাউড লগইনে কাজে লাগবে)&lt;/label>&lt;input id="tmEmail" value="${esc(m.email)}" placeholder="<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e88689858da88f85898184c68b8785">[email&#160;protected]</a>">&lt;/div>
+    &lt;div class="field">&lt;label>Google মেইল (ইচ্ছা হলে — পরে ক্লাউড লগইনে কাজে লাগবে)&lt;/label>&lt;input id="tmEmail" value="${esc(m.email)}" placeholder="<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="fa949b979fba9d979b9396d4999597">[email&#160;protected]</a>">&lt;/div>
     ${isNew? `&lt;div class="field">&lt;label>PIN (৪–৬ সংখ্যা)&lt;/label>&lt;input id="tmPin" inputmode="numeric" type="password" maxlength="6" placeholder="••••">&lt;/div>`:''}
     ${(!isNew)? `&lt;div class="field">&lt;label>নতুন PIN (বদলাতে না চাইলে খালি রাখুন)&lt;/label>&lt;input id="tmPin" inputmode="numeric" type="password" maxlength="6" placeholder="••••">&lt;/div>
       &lt;label class="check">&lt;input type="checkbox" id="tmActive" ${m.active!==false?'checked':''}> এই সদস্য এখন সক্রিয়&lt;/label>`:''}
@@ -6736,7 +6736,7 @@ function fbProvider(which){
 function fbLoginGoogle(msgEl){ fbSignIn('google', msgEl); }
 function fbLoginEmailUI(msgEl){
   const box=document.getElementById(msgEl||'fbMsg');
-  if(box) box.innerHTML=`&lt;div class="field" style="text-align:left">&lt;label>ইমেইল&lt;/label>&lt;input id="fbMail" type="email" placeholder="<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="690708040c290e04080005470a0604">[email&#160;protected]</a>">&lt;/div>
+  if(box) box.innerHTML=`&lt;div class="field" style="text-align:left">&lt;label>ইমেইল&lt;/label>&lt;input id="fbMail" type="email" placeholder="<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2f414e424a6f48424e4643014c4042">[email&#160;protected]</a>">&lt;/div>
     &lt;div class="field" style="text-align:left">&lt;label>পাসওয়ার্ড&lt;/label>&lt;input id="fbPass" type="password" placeholder="••••••">&lt;/div>
     &lt;div class="modal-actions" style="justify-content:flex-start">
       &lt;button class="btn" onclick="fbEmailGo(1)">ঢুকুন&lt;/button>
@@ -7073,7 +7073,7 @@ service cloud.firestore {
     // 🔴 নিচের লাইনে আপনার নিজের Gmail বসান — এটাই প্রথম প্রধান (owner)
     function boss() {
       return request.auth != null &amp;&amp; request.auth.token.email != null &amp;&amp;
-             request.auth.token.email.lower() in ['<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2e77617b7c0369636f67626e49434f4742004d4143">[email&#160;protected]</a>'];
+             request.auth.token.email.lower() in ['<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="0950465c5b244e44484045496e64686065276a6664">[email&#160;protected]</a>'];
     }
     function me(room) {
       return get(/databases/$(database)/documents/rooms/$(room)/members/$(request.auth.uid)).data;
@@ -9504,6 +9504,816 @@ $('#menuBtn').onclick=()=>$('#overlay').classList.add('open');$('#overlay').oncl
 })();
 
 &lt;/script>
+
+&lt;script>
+/* ==== Workflow — নতুন মেনু ও ৯টি নতুন পর্দা (v36) ====
+   ব্যবহারকারীর চাওয়া অনুযায়ী Cash Book-এর মেনুর সব কাজ Workflow-তে যোগ করা হলো:
+   Summary ✓ (আগেই ছিল) · Account Summary · Transaction-All Accounts · Accounts ✓ ·
+   Transfer ✓ · Report-All Accounts · Transaction names · Notebook · Calendar ·
+   Cash Calculator ✓ · Backup and Restore ✓ · Settings · Deleted Transactions · Help ·
+   Other Apps।
+   সব তথ্য একই জায়গায় থাকে (localStorage · cashbook_html_v1) — নতুন কিছু আলাদা ফাইলে নয়,
+   আর নোটবুক/ট্র্যাশ/সেটিংসও ব্যাকআপের আওতায় (cashbook_ নামে)।
+*/
+(function () {
+  'use strict';
+
+  var KEY = 'cashbook_html_v1';          // অ্যাপের নিজের ডেটা
+  var NKEY = 'cashbook_notes_v1';        // 📓 নোটবুক
+  var TKEY = 'cashbook_trash_v1';        // 🗑 ডিলিট করা লেনদেন
+  var SKEY = 'cashbook_settings_v1';     // ⚙ সেটিংস
+
+  function $(s, r) { return (r || document).querySelector(s); }
+  function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&amp;&lt;>"']/g, function (c) {
+      return { '&amp;': '&amp;amp;', '&lt;': '&amp;lt;', '>': '&amp;gt;', '"': '&amp;quot;', "'": '&amp;#39;' }[c];
+    });
+  }
+  function num(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+  function group(n) {
+    var s = (Math.round((Number(n) || 0) * 100) / 100).toFixed(2).replace(/\.00$/, '');
+    var p = s.split('.');
+    var a = p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return p[1] ? a + '.' + p[1] : a;
+  }
+  function bnD(s) { return String(s).replace(/[0-9]/g, function (d) { return '০১২৩৪৫৬৭৮৯'[+d]; }); }
+  function enD(s) { return String(s).replace(/[০-৯]/g, function (d) { return String('০১২৩৪৫৬৭৮৯'.indexOf(d)); }); }
+
+  /* ---------------- সেটিংস ---------------- */
+  var SDEF = { digits: 'en', fs: 100, showTime: 'on', color: 'blue' };
+  function settings() {
+    var o = {};
+    try { o = JSON.parse(localStorage.getItem(SKEY) || '{}') || {}; } catch (e) { o = {}; }
+    var out = {};
+    for (var k in SDEF) out[k] = (o[k] === undefined ? SDEF[k] : o[k]);
+    return out;
+  }
+  function saveSettings(o) { try { localStorage.setItem(SKEY, JSON.stringify(o)); } catch (e) {} }
+  function F(n) { var s = group(n); return settings().digits === 'bn' ? bnD(s) : s; }
+  function D(v) { return settings().digits === 'bn' ? bnD(v) : String(v); }
+
+  /* ---------------- ডেটা পড়া/লেখা ---------------- */
+  function readState() {
+    try {
+      var o = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (o &amp;&amp; Array.isArray(o.accounts) &amp;&amp; Array.isArray(o.transactions)) return o;
+    } catch (e) {}
+    return { version: 1, accounts: [], transactions: [], selected: null };
+  }
+  function saveState(st) {
+    try { localStorage.setItem(KEY, JSON.stringify(st)); return true; }
+    catch (e) { alert('সেভ করা গেল না — ফোনের জায়গা শেষ হতে পারে।'); return false; }
+  }
+  function notes() {
+    var o = [];
+    try { o = JSON.parse(localStorage.getItem(NKEY) || '[]') || []; } catch (e) { o = []; }
+    return Array.isArray(o) ? o : [];
+  }
+  function saveNotes(a) { try { localStorage.setItem(NKEY, JSON.stringify(a)); } catch (e) {} }
+  function trash() {
+    var o = [];
+    try { o = JSON.parse(localStorage.getItem(TKEY) || '[]') || []; } catch (e) { o = []; }
+    return Array.isArray(o) ? o : [];
+  }
+  function saveTrash(a) { try { localStorage.setItem(TKEY, JSON.stringify(a)); } catch (e) {} }
+  function acctName(st, id) {
+    var a = (st.accounts || []).filter(function (x) { return x.id === id; })[0];
+    return a ? a.name : '—';
+  }
+  function sortTx(a, b) {
+    return (b.date || '').localeCompare(a.date || '') || (b.time || '').localeCompare(a.time || '') || ((b.created || 0) - (a.created || 0));
+  }
+  function dtxt(s) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s || '')) return s || '';
+    var d = new Date(s + 'T12:00:00');
+    return d.toLocaleDateString('bn-BD', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  function wd(s) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s || '')) return '';
+    return new Date(s + 'T12:00:00').toLocaleDateString('bn-BD', { weekday: 'short' });
+  }
+  var MON = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
+
+  /* ---------------- 🗑 ডিলিট করা লেনদেন ধরে রাখা ----------------
+     অ্যাপ নিজে যেভাবেই লেনদেন মোছুক, সেভ করার সময় আগের সাথে তুলনা করে
+     মুছে যাওয়া লেনদেনগুলো ট্র্যাশে রেখে দিই — তাই ভুলে মুছলেও ফেরানো যায়। */
+  function capture(oldRaw, newRaw) {
+    var o, n;
+    try { o = JSON.parse(oldRaw || 'null'); } catch (e) { return; }
+    try { n = JSON.parse(newRaw || 'null'); } catch (e) { return; }
+    if (!o || !Array.isArray(o.transactions) || !n || !Array.isArray(n.transactions)) return;
+    var keep = {};
+    n.transactions.forEach(function (t) { keep[t.id] = 1; });
+    var gone = o.transactions.filter(function (t) { return t &amp;&amp; t.id &amp;&amp; !keep[t.id]; });
+    if (!gone.length) return;
+    var tr = trash(), have = {};
+    tr.forEach(function (t) { have[t.id] = 1; });
+    gone.forEach(function (t) {
+      if (have[t.id]) return;
+      var c = JSON.parse(JSON.stringify(t));
+      c.accountName = acctName(o, t.accountId);
+      c.deletedAt = Date.now();
+      tr.unshift(c);
+    });
+    if (tr.length > 300) tr = tr.slice(0, 300);
+    saveTrash(tr);
+  }
+  (function hookStorage() {
+    try {
+      var real = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (k, v) {
+        if (k === KEY) { try { capture(this.getItem(k), v); } catch (e) {} }
+        return real.apply(this, arguments);
+      };
+    } catch (e) {}
+  })();
+
+  /* ---------------- পর্দা বানানো ---------------- */
+  function mkScreen(id, title, sub) {
+    var sec = document.createElement('section');
+    sec.className = 'screen mb-screen';
+    sec.id = id;
+    sec.innerHTML =
+      '&lt;header class="standard-head">&lt;div class="toolbar">' +
+        '&lt;button class="icon-btn mb-back" type="button" aria-label="পেছনে">←&lt;/button>' +
+        '&lt;div class="screen-title">' + esc(title) + (sub ? '&lt;small>' + esc(sub) + '&lt;/small>' : '') + '&lt;/div>' +
+        '&lt;button class="icon-btn mb-menu" type="button" aria-label="মেনু">☰&lt;/button>' +
+      '&lt;/div>&lt;/header>&lt;div class="body" id="' + id + 'Body">&lt;/div>';
+    return sec;
+  }
+  function showScreen(id) {
+    $$('.screen').forEach(function (x) { x.classList.toggle('active', x.id === id); });
+    var ov = $('#overlay'); if (ov) ov.classList.remove('open');
+    try { window.scrollTo(0, 0); } catch (e) {}
+    var r = RENDERS[id];
+    if (r) { try { r(); } catch (e) { console.error(e); } }
+  }
+
+  var RENDERS = {};
+
+  /* ---------------- ১) হিসাব সারসংক্ষেপ ---------------- */
+  function row2(name, val, cls) {
+    return '&lt;div class="mb-row">&lt;span>' + esc(name) + '&lt;/span>&lt;b class="' + (cls || '') + '">' + F(val) + '&lt;/b>&lt;/div>';
+  }
+  RENDERS.mbAccSum = function () {
+    var st = readState(), body = $('#mbAccSumBody');
+    var tot = { i: 0, o: 0, n: 0 };
+    var cards = st.accounts.slice().sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'bn'); }).map(function (a) {
+      var ts = st.transactions.filter(function (t) { return t.accountId === a.id; });
+      var i = 0, o = 0;
+      ts.forEach(function (t) { if (t.type === 'in') i += num(t.amount); else o += num(t.amount); });
+      tot.i += i; tot.o += o; tot.n += ts.length;
+      return '&lt;div class="content-card mb-card">' +
+        '&lt;div class="mb-card-head">&lt;span class="mb-acc-name">' + esc(a.name) + '&lt;/span>' +
+        '&lt;span class="mb-pill">' + D(ts.length) + ' টি লেনদেন&lt;/span>&lt;/div>' +
+        row2('মোট জমা (Cash In)', i, 'in') + row2('মোট খরচ (Cash Out)', o, 'out') +
+        row2('স্থিতি (Balance)', i - o, (i - o) &lt; 0 ? 'out' : 'in') +
+      '&lt;/div>';
+    }).join('');
+    body.innerHTML =
+      '&lt;div class="content-card mb-card mb-total">' +
+        '&lt;div class="mb-card-head">&lt;span class="mb-acc-name">সব অ্যাকাউন্ট মিলিয়ে&lt;/span>' +
+        '&lt;span class="mb-pill">' + D(st.accounts.length) + ' টি অ্যাকাউন্ট · ' + D(tot.n) + ' লেনদেন&lt;/span>&lt;/div>' +
+        row2('মোট জমা', tot.i, 'in') + row2('মোট খরচ', tot.o, 'out') +
+        row2('স্থিতি', tot.i - tot.o, (tot.i - tot.o) &lt; 0 ? 'out' : 'in') +
+      '&lt;/div>' + (cards || '&lt;p class="hint">এখনো কোনো অ্যাকাউন্ট নেই।&lt;/p>');
+  };
+
+  /* ---------------- ২) সব লেনদেন (সব অ্যাকাউন্ট) ---------------- */
+  var allTxMon = 'all', allTxQ = '';
+  function months(st) {
+    var m = {};
+    st.transactions.forEach(function (t) { if (/^\d{4}-\d{2}/.test(t.date || '')) m[(t.date || '').slice(0, 7)] = 1; });
+    return Object.keys(m).sort().reverse();
+  }
+  RENDERS.mbAllTx = function () {
+    var st = readState(), body = $('#mbAllTxBody');
+    var ms = months(st);
+    var opts = ['&lt;option value="all">সব মাস&lt;/option>'].concat(ms.map(function (k) {
+      var y = k.slice(0, 4), mo = Number(k.slice(5, 7));
+      return '&lt;option value="' + k + '"' + (allTxMon === k ? ' selected' : '') + '>' + esc(MON[mo - 1] + ' ' + y) + '&lt;/option>';
+    })).join('');
+    var list = st.transactions.filter(function (t) {
+      if (allTxMon !== 'all' &amp;&amp; (t.date || '').slice(0, 7) !== allTxMon) return false;
+      if (!allTxQ) return true;
+      var hay = (t.description || '') + ' ' + (t.notes || '') + ' ' + (t.items || '') + ' ' + acctName(st, t.accountId);
+      return hay.toLowerCase().indexOf(allTxQ.toLowerCase()) >= 0;
+    }).sort(sortTx);
+    var i = 0, o = 0;
+    list.forEach(function (t) { if (t.type === 'in') i += num(t.amount); else o += num(t.amount); });
+    var rows = list.map(function (t) {
+      return '&lt;div class="mb-tx">&lt;div class="mb-tx-l">&lt;b>' + esc(t.description || t.notes || 'লেনদেন') + '&lt;/b>' +
+        '&lt;small>' + esc(dtxt(t.date)) + ' · ' + esc(acctName(st, t.accountId)) + '&lt;/small>&lt;/div>' +
+        '&lt;b class="' + (t.type === 'in' ? 'in' : 'out') + '">' + (t.type === 'in' ? '+' : '−') + F(t.amount) + '&lt;/b>&lt;/div>';
+    }).join('');
+    body.innerHTML =
+      '&lt;div class="mb-tools">&lt;select id="mbAllMon" class="field mb-sel">' + opts + '&lt;/select>' +
+      '&lt;input id="mbAllQ" class="field" placeholder="⌕ খুঁজুন (নাম/বিবরণ)" value="' + esc(allTxQ) + '">&lt;/div>' +
+      '&lt;div class="content-card mb-card mb-total">' +
+        row2('দেখানো হচ্ছে', list.length, '') + row2('মোট জমা', i, 'in') + row2('মোট খরচ', o, 'out') +
+        row2('स्थिति', i - o, (i - o) &lt; 0 ? 'out' : 'in') + '&lt;/div>' +
+      '&lt;div class="mb-btns">&lt;button class="blue-btn" id="mbAllPdf" type="button">🖨️ PDF / প্রিন্ট&lt;/button>' +
+      '&lt;button class="blue-btn mb-grey" id="mbAllCsv" type="button">📄 Excel (CSV)&lt;/button>&lt;/div>' +
+      '&lt;div class="content-card mb-list">' + (rows || '&lt;p class="empty">কোনো লেনদেন নেই&lt;/p>') + '&lt;/div>';
+    $('#mbAllMon').onchange = function () { allTxMon = this.value; RENDERS.mbAllTx(); };
+    $('#mbAllQ').oninput = function () { allTxQ = this.value; RENDERS.mbAllTx(); };
+    $('#mbAllPdf').onclick = function () { printAll(st, list); };
+    $('#mbAllCsv').onclick = function () { csvAll(st, list); };
+  };
+
+  function printAll(st, list) {
+    var i = 0, o = 0;
+    list.forEach(function (t) { if (t.type === 'in') i += num(t.amount); else o += num(t.amount); });
+    var rows = list.map(function (t) {
+      return '&lt;tr>&lt;td>' + esc(dtxt(t.date)) + '&lt;/td>&lt;td>' + esc(acctName(st, t.accountId)) + '&lt;/td>' +
+        '&lt;td>' + esc(t.description || t.notes || '') + '&lt;/td>' +
+        '&lt;td class="r in">' + (t.type === 'in' ? F(t.amount) : '') + '&lt;/td>' +
+        '&lt;td class="r out">' + (t.type === 'out' ? F(t.amount) : '') + '&lt;/td>&lt;/tr>';
+    }).join('');
+    var box = $('#mbPrint');
+    box.innerHTML = '&lt;h2>সব লেনদেন — সব অ্যাকাউন্ট&lt;/h2>' +
+      '&lt;p>মাস: ' + esc(allTxMon === 'all' ? 'সব মাস' : allTxMon) + ' · তৈরি: ' + esc(dtxt(new Date().toISOString().slice(0, 10))) + '&lt;/p>' +
+      '&lt;table>&lt;thead>&lt;tr>&lt;th>তারিখ&lt;/th>&lt;th>অ্যাকাউন্ট&lt;/th>&lt;th>বিবরণ&lt;/th>&lt;th class="r">জমা&lt;/th>&lt;th class="r">খরচ&lt;/th>&lt;/tr>&lt;/thead>' +
+      '&lt;tbody>' + rows + '&lt;/tbody>&lt;tfoot>&lt;tr>&lt;td colspan="3">&lt;b>মোট&lt;/b>&lt;/td>&lt;td class="r in">&lt;b>' + F(i) + '&lt;/b>&lt;/td>' +
+      '&lt;td class="r out">&lt;b>' + F(o) + '&lt;/b>&lt;/td>&lt;/tr>' +
+      '&lt;tr>&lt;td colspan="3">&lt;b>স্থিতি&lt;/b>&lt;/td>&lt;td class="r" colspan="2">&lt;b>' + F(i - o) + '&lt;/b>&lt;/td>&lt;/tr>&lt;/tfoot>&lt;/table>';
+    doPrint();
+  }
+  function csvAll(st, list) {
+    var head = 'তারিখ,অ্যাকাউন্ট,বিবরণ,জমা,খরচ\n';
+    var body = list.map(function (t) {
+      var q = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+      return [q(t.date), q(acctName(st, t.accountId)), q(t.description || t.notes || ''),
+        q(t.type === 'in' ? num(t.amount) : ''), q(t.type === 'out' ? num(t.amount) : '')].join(',');
+    }).join('\n');
+    saveText('workflow-all-transactions.csv', '\ufeff' + head + body, 'text/csv;charset=utf-8');
+  }
+  function saveText(name, data, mime) {
+    try {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([data], { type: mime || 'text/plain;charset=utf-8' }));
+      a.download = name;
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { try { URL.revokeObjectURL(a.href); a.remove(); } catch (e) {} }, 2500);
+      return true;
+    } catch (e) { alert('ফাইল নামানো গেল না'); return false; }
+  }
+  function doPrint() {
+    document.body.classList.add('mb-printing');
+    var done = function () {
+      document.body.classList.remove('mb-printing');
+      window.removeEventListener('afterprint', done);
+    };
+    window.addEventListener('afterprint', done);
+    setTimeout(function () { try { window.print(); } catch (e) {} setTimeout(done, 1200); }, 60);
+  }
+
+  /* ---------------- ৩) রিপোর্ট — সব অ্যাকাউন্ট ---------------- */
+  RENDERS.mbRepAll = function () {
+    var st = readState(), body = $('#mbRepAllBody');
+    var ti = 0, to = 0;
+    var perAcc = st.accounts.slice().sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'bn'); }).map(function (a) {
+      var i = 0, o = 0, n = 0;
+      st.transactions.forEach(function (t) {
+        if (t.accountId !== a.id) return;
+        n++;
+        if (t.type === 'in') i += num(t.amount); else o += num(t.amount);
+      });
+      ti += i; to += o;
+      return { name: a.name, i: i, o: o, n: n };
+    });
+    var byMon = {};
+    st.transactions.forEach(function (t) {
+      var k = (t.date || '').slice(0, 7) || '—';
+      if (!byMon[k]) byMon[k] = { i: 0, o: 0, n: 0 };
+      byMon[k].n++;
+      if (t.type === 'in') byMon[k].i += num(t.amount); else byMon[k].o += num(t.amount);
+    });
+    var mrows = Object.keys(byMon).sort().reverse().map(function (k) {
+      var v = byMon[k], y = k.slice(0, 4), mo = Number(k.slice(5, 7));
+      return '&lt;div class="mb-tx">&lt;div class="mb-tx-l">&lt;b>' + esc(MON[mo - 1] + ' ' + y) + '&lt;/b>' +
+        '&lt;small>' + D(v.n) + ' টি লেনদেন&lt;/small>&lt;/div>' +
+        '&lt;span class="mb-pair">&lt;b class="in">+' + F(v.i) + '&lt;/b> &lt;b class="out">−' + F(v.o) + '&lt;/b>&lt;/span>&lt;/div>';
+    }).join('');
+    body.innerHTML =
+      '&lt;div class="content-card mb-card mb-total">' +
+        row2('মোট জমা', ti, 'in') + row2('মোট খরচ', to, 'out') +
+        row2('স্থিতি', ti - to, (ti - to) &lt; 0 ? 'out' : 'in') +
+        row2('মোট লেনদেন', st.transactions.length, '') + '&lt;/div>' +
+      '&lt;h3 class="mb-h">অ্যাকাউন্ট অনুযায়ী&lt;/h3>&lt;div class="content-card mb-list">' +
+        (perAcc.map(function (r) {
+          return '&lt;div class="mb-tx">&lt;div class="mb-tx-l">&lt;b>' + esc(r.name) + '&lt;/b>&lt;small>' + D(r.n) + ' টি লেনদেন&lt;/small>&lt;/div>' +
+            '&lt;span class="mb-pair">&lt;b class="in">+' + F(r.i) + '&lt;/b> &lt;b class="out">−' + F(r.o) + '&lt;/b>&lt;/span>&lt;/div>';
+        }).join('') || '&lt;p class="empty">কোনো অ্যাকাউন্ট নেই&lt;/p>') + '&lt;/div>' +
+      '&lt;h3 class="mb-h">মাস অনুযায়ী&lt;/h3>&lt;div class="content-card mb-list">' + (mrows || '&lt;p class="empty">কোনো লেনদেন নেই&lt;/p>') + '&lt;/div>' +
+      '&lt;div class="mb-btns">&lt;button class="blue-btn" id="mbRepPdf" type="button">🖨️ PDF / প্রিন্ট&lt;/button>' +
+      '&lt;button class="blue-btn mb-grey" id="mbRepCsv" type="button">📄 Excel (CSV)&lt;/button>&lt;/div>';
+    $('#mbRepPdf').onclick = function () {
+      var box = $('#mbPrint');
+      box.innerHTML = '&lt;h2>রিপোর্ট — সব অ্যাকাউন্ট&lt;/h2>&lt;p>তৈরি: ' + esc(dtxt(new Date().toISOString().slice(0, 10))) + '&lt;/p>' +
+        '&lt;table>&lt;thead>&lt;tr>&lt;th>অ্যাকাউন্ট&lt;/th>&lt;th class="r">লেনদেন&lt;/th>&lt;th class="r">জমা&lt;/th>&lt;th class="r">খরচ&lt;/th>&lt;th class="r">স্থিতি&lt;/th>&lt;/tr>&lt;/thead>&lt;tbody>' +
+        perAcc.map(function (r) {
+          return '&lt;tr>&lt;td>' + esc(r.name) + '&lt;/td>&lt;td class="r">' + D(r.n) + '&lt;/td>&lt;td class="r in">' + F(r.i) +
+            '&lt;/td>&lt;td class="r out">' + F(r.o) + '&lt;/td>&lt;td class="r">' + F(r.i - r.o) + '&lt;/td>&lt;/tr>';
+        }).join('') +
+        '&lt;/tbody>&lt;tfoot>&lt;tr>&lt;td>&lt;b>মোট&lt;/b>&lt;/td>&lt;td class="r">&lt;b>' + D(st.transactions.length) + '&lt;/b>&lt;/td>' +
+        '&lt;td class="r in">&lt;b>' + F(ti) + '&lt;/b>&lt;/td>&lt;td class="r out">&lt;b>' + F(to) + '&lt;/b>&lt;/td>' +
+        '&lt;td class="r">&lt;b>' + F(ti - to) + '&lt;/b>&lt;/td>&lt;/tr>&lt;/tfoot>&lt;/table>' +
+        '&lt;h3>মাস অনুযায়ী&lt;/h3>&lt;table>&lt;thead>&lt;tr>&lt;th>মাস&lt;/th>&lt;th class="r">লেনদেন&lt;/th>&lt;th class="r">জমা&lt;/th>&lt;th class="r">খরচ&lt;/th>&lt;/tr>&lt;/thead>&lt;tbody>' +
+        Object.keys(byMon).sort().reverse().map(function (k) {
+          var v = byMon[k];
+          return '&lt;tr>&lt;td>' + esc(k) + '&lt;/td>&lt;td class="r">' + D(v.n) + '&lt;/td>&lt;td class="r in">' + F(v.i) + '&lt;/td>&lt;td class="r out">' + F(v.o) + '&lt;/td>&lt;/tr>';
+        }).join('') + '&lt;/tbody>&lt;/table>';
+      doPrint();
+    };
+    $('#mbRepCsv').onclick = function () {
+      var head = 'অ্যাকাউন্ট,লেনদেন,জমা,খরচ,স্থিতি\n';
+      var rows = perAcc.map(function (r) {
+        return '"' + r.name.replace(/"/g, '""') + '",' + r.n + ',' + r.i + ',' + r.o + ',' + (r.i - r.o);
+      }).join('\n');
+      var m = '\n\nমাস,লেনদেন,জমা,খরচ\n' + Object.keys(byMon).sort().reverse().map(function (k) {
+        var v = byMon[k]; return k + ',' + v.n + ',' + v.i + ',' + v.o;
+      }).join('\n');
+      saveText('workflow-report-all-accounts.csv', '\ufeff' + head + rows + m, 'text/csv;charset=utf-8');
+    };
+  };
+
+  /* ---------------- ৪) লেনদেনের নাম ---------------- */
+  RENDERS.mbNames = function () {
+    var st = readState(), body = $('#mbNamesBody');
+    var map = {};
+    st.transactions.forEach(function (t) {
+      var k = String(t.description || t.notes || 'লেনদেন').trim();
+      if (!map[k]) map[k] = { n: 0, i: 0, o: 0 };
+      map[k].n++;
+      if (t.type === 'in') map[k].i += num(t.amount); else map[k].o += num(t.amount);
+    });
+    var keys = Object.keys(map).sort(function (a, b) { return map[b].n - map[a].n || a.localeCompare(b, 'bn'); });
+    body.innerHTML =
+      '&lt;p class="hint">আগে যেসব নামে লেনদেন লিখেছেন — নাম ছুঁলে হোমে সেই নামেই তালিকা ছেঁকে আসবে।&lt;/p>' +
+      '&lt;div class="content-card mb-list">' + (keys.map(function (k) {
+        var v = map[k];
+        return '&lt;div class="mb-tx mb-tappable" data-name="' + esc(k) + '">&lt;div class="mb-tx-l">&lt;b>' + esc(k) + '&lt;/b>' +
+          '&lt;small>' + D(v.n) + ' বার&lt;/small>&lt;/div>' +
+          '&lt;span class="mb-pair">&lt;b class="in">+' + F(v.i) + '&lt;/b> &lt;b class="out">−' + F(v.o) + '&lt;/b>&lt;/span>&lt;/div>';
+      }).join('') || '&lt;p class="empty">এখনো কোনো লেনদেন নেই&lt;/p>') + '&lt;/div>';
+    $$('[data-name]', body).forEach(function (el) {
+      el.onclick = function () {
+        var q = el.getAttribute('data-name');
+        showScreen('home');
+        var s = $('#search');
+        if (s) { s.value = q; s.dispatchEvent(new Event('input', { bubbles: true })); }
+      };
+    });
+  };
+
+  /* ---------------- ৫) নোটবুক ---------------- */
+  RENDERS.mbNote = function () {
+    var body = $('#mbNoteBody'), list = notes();
+    body.innerHTML =
+      '&lt;div class="panel">&lt;textarea id="mbNoteTxt" class="field" rows="3" placeholder="নোট লিখুন… (যেমন: মিটিং-এ যা ঠিক হলো)">&lt;/textarea>' +
+      '&lt;button class="blue-btn mb-wide" id="mbNoteAdd" type="button">＋ নোট যোগ করুন&lt;/button>&lt;/div>' +
+      '&lt;div class="content-card mb-list">' + (list.length ? list.map(function (n) {
+        var d = new Date(n.at || Date.now());
+        return '&lt;div class="mb-note">&lt;div class="mb-note-t">' + esc(n.text).replace(/\n/g, '&lt;br>') + '&lt;/div>' +
+          '&lt;div class="mb-note-f">&lt;small>' + esc(d.toLocaleDateString('bn-BD', { day: '2-digit', month: 'short', year: 'numeric' }) +
+            ' · ' + d.toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })) + '&lt;/small>' +
+          '&lt;button class="mb-mini del" data-del-note="' + esc(n.id) + '" type="button">🗑 মুছুন&lt;/button>&lt;/div>&lt;/div>';
+      }).join('') : '&lt;p class="empty">এখনো কোনো নোট নেই&lt;/p>') + '&lt;/div>';
+    $('#mbNoteAdd').onclick = function () {
+      var t = ($('#mbNoteTxt').value || '').trim();
+      if (!t) { alert('আগে নোট লিখুন'); return; }
+      var a = notes();
+      a.unshift({ id: 'n' + Date.now().toString(36), text: t, at: Date.now() });
+      saveNotes(a);
+      RENDERS.mbNote();
+    };
+    $$('[data-del-note]', body).forEach(function (b) {
+      b.onclick = function () {
+        if (!confirm('নোটটা মুছে ফেলবেন?')) return;
+        saveNotes(notes().filter(function (n) { return n.id !== b.getAttribute('data-del-note'); }));
+        RENDERS.mbNote();
+      };
+    });
+  };
+
+  /* ---------------- ৬) ক্যালেন্ডার ---------------- */
+  var calY = new Date().getFullYear(), calM = new Date().getMonth(), calDay = null;
+  RENDERS.mbCal = function () {
+    var st = readState(), body = $('#mbCalBody');
+    var dayMap = {};
+    st.transactions.forEach(function (t) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(t.date || '')) return;
+      if (!dayMap[t.date]) dayMap[t.date] = { i: 0, o: 0, n: 0 };
+      dayMap[t.date].n++;
+      if (t.type === 'in') dayMap[t.date].i += num(t.amount); else dayMap[t.date].o += num(t.amount);
+    });
+    var first = new Date(calY, calM, 1);
+    var startDow = first.getDay();                 // 0=রবি
+    var days = new Date(calY, calM + 1, 0).getDate();
+    var cells = '';
+    for (var b = 0; b &lt; startDow; b++) cells += '&lt;div class="mb-cell mb-blank">&lt;/div>';
+    var mi = 0, mo = 0;
+    for (var d = 1; d &lt;= days; d++) {
+      var key = calY + '-' + String(calM + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      var v = dayMap[key];
+      if (v) { mi += v.i; mo += v.o; }
+      var cls = 'mb-cell';
+      if (v) cls += (v.i - v.o) >= 0 ? ' pos' : ' neg';
+      if (key === calDay) cls += ' sel';
+      cells += '&lt;button class="' + cls + '" type="button" data-day="' + key + '">' +
+        '&lt;span class="d">' + D(d) + '&lt;/span>' +
+        (v ? '&lt;span class="dot">&lt;/span>' : '') + '&lt;/button>';
+    }
+    var det = '';
+    if (calDay) {
+      var list = st.transactions.filter(function (t) { return t.date === calDay; }).sort(sortTx);
+      var di = 0, doo = 0;
+      list.forEach(function (t) { if (t.type === 'in') di += num(t.amount); else doo += num(t.amount); });
+      det = '&lt;h3 class="mb-h">' + esc(dtxt(calDay) + ' · ' + wd(calDay)) + '&lt;/h3>' +
+        '&lt;div class="content-card mb-card">' + row2('জমা', di, 'in') + row2('খরচ', doo, 'out') + row2('স্থিতি', di - doo, (di - doo) &lt; 0 ? 'out' : 'in') + '&lt;/div>' +
+        '&lt;div class="content-card mb-list">' + (list.map(function (t) {
+          return '&lt;div class="mb-tx">&lt;div class="mb-tx-l">&lt;b>' + esc(t.description || t.notes || 'লেনদেন') + '&lt;/b>' +
+            '&lt;small>' + esc(acctName(st, t.accountId)) + '&lt;/small>&lt;/div>' +
+            '&lt;b class="' + (t.type === 'in' ? 'in' : 'out') + '">' + (t.type === 'in' ? '+' : '−') + F(t.amount) + '&lt;/b>&lt;/div>';
+        }).join('') || '&lt;p class="empty">এই দিনে কোনো লেনদেন নেই&lt;/p>') + '&lt;/div>';
+    }
+    body.innerHTML =
+      '&lt;div class="mb-calhead">&lt;button class="mb-nav" id="mbCalPrev" type="button">‹&lt;/button>' +
+      '&lt;b>' + esc(MON[calM] + ' ' + calY) + '&lt;/b>' +
+      '&lt;button class="mb-nav" id="mbCalNext" type="button">›&lt;/button>&lt;/div>' +
+      '&lt;div class="mb-week">' + ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'].map(function (x) { return '&lt;span>' + x + '&lt;/span>'; }).join('') + '&lt;/div>' +
+      '&lt;div class="mb-grid">' + cells + '&lt;/div>' +
+      '&lt;div class="content-card mb-card">' + row2('এই মাসে জমা', mi, 'in') + row2('এই মাসে খরচ', mo, 'out') +
+        row2('স্থিতি', mi - mo, (mi - mo) &lt; 0 ? 'out' : 'in') + '&lt;/div>' + det;
+    $('#mbCalPrev').onclick = function () { calM--; if (calM &lt; 0) { calM = 11; calY--; } calDay = null; RENDERS.mbCal(); };
+    $('#mbCalNext').onclick = function () { calM++; if (calM > 11) { calM = 0; calY++; } calDay = null; RENDERS.mbCal(); };
+    $$('[data-day]', body).forEach(function (b2) {
+      b2.onclick = function () { calDay = b2.getAttribute('data-day'); RENDERS.mbCal(); };
+    });
+  };
+
+  /* ---------------- ৭) সেটিংস ---------------- */
+  RENDERS.mbSet = function () {
+    var body = $('#mbSetBody'), s = settings();
+    function seg(id, val, opts) {
+      return '&lt;div class="mb-seg" id="' + id + '">' + opts.map(function (o) {
+        return '&lt;button type="button" data-v="' + o[0] + '" class="' + (val === o[0] ? 'on' : '') + '">' + o[1] + '&lt;/button>';
+      }).join('') + '&lt;/div>';
+    }
+    body.innerHTML =
+      '&lt;div class="panel">&lt;h3 class="mb-h2">সংখ্যার ধরন&lt;/h3>' +
+        seg('mbSgDigits', s.digits, [['en', 'ইংরেজি 123'], ['bn', 'বাংলা ১২৩']]) +
+        '&lt;p class="hint">টাকার অঙ্ক ও তারিখ কীভাবে দেখাবে।&lt;/p>' +
+        '&lt;h3 class="mb-h2">লেখার মাপ&lt;/h3>' +
+        seg('mbSgFs', String(s.fs), [['90', 'ছোট'], ['100', 'মাঝারি'], ['115', 'বড়']]) +
+        '&lt;h3 class="mb-h2">সারিতে সময় দেখাব?&lt;/h3>' +
+        seg('mbSgTime', s.showTime, [['on', 'দেখাব'], ['off', 'লুকাব']]) +
+        '&lt;h3 class="mb-h2">অ্যাপের রঙ&lt;/h3>' +
+        seg('mbSgColor', s.color, [['blue', 'নীল'], ['green', 'সবুজ'], ['dark', 'গাঢ়']]) +
+      '&lt;/div>' +
+      '&lt;div class="panel">&lt;h3 class="mb-h2">তথ্য&lt;/h3>' +
+        '&lt;p class="hint">সব হিসাব আপনার এই ফোনেই থাকে — কোনো সার্ভারে যায় না। Google Drive-এ রাখতে Multi Business-এর হোমে 🔼 আপলোড চাপুন।&lt;/p>' +
+        '&lt;button class="blue-btn mb-wide" id="mbSetReset" type="button">↺ সেটিংস আগের মতো করুন&lt;/button>' +
+      '&lt;/div>' +
+      '&lt;div class="mb-btns">&lt;button class="blue-btn mb-grey" id="mbSetHelp" type="button">❓ সাহায্য দেখুন&lt;/button>&lt;/div>';
+    function bindSeg(id, key, numeric) {
+      $$('#' + id + ' button').forEach(function (b) {
+        b.onclick = function () {
+          var cur = settings();
+          cur[key] = numeric ? Number(b.getAttribute('data-v')) : b.getAttribute('data-v');
+          saveSettings(cur);
+          applySettings();
+          RENDERS.mbSet();
+          RENDERS.mbAccSum &amp;&amp; RENDERS.mbAccSum();
+        };
+      });
+    }
+    bindSeg('mbSgDigits', 'digits');
+    bindSeg('mbSgFs', 'fs', true);
+    bindSeg('mbSgTime', 'showTime');
+    bindSeg('mbSgColor', 'color');
+    $('#mbSetReset').onclick = function () {
+      if (!confirm('সেটিংস আগের মতো (ডিফল্ট) করবেন?')) return;
+      saveSettings({ digits: 'en', fs: 100, showTime: 'on', color: 'blue' });
+      applySettings(); RENDERS.mbSet();
+    };
+    $('#mbSetHelp').onclick = function () { showScreen('mbHelp'); };
+  };
+
+  /* ---------------- ৮) ডিলিট করা লেনদেন ---------------- */
+  RENDERS.mbTrash = function () {
+    var body = $('#mbTrashBody'), list = trash();
+    body.innerHTML =
+      '&lt;p class="hint">মুছে ফেলা লেনদেন এখানে জমা থাকে — ভুলে মুছলে এখান থেকেই ফিরিয়ে আনা যায়।&lt;/p>' +
+      '&lt;div class="content-card mb-list">' + (list.length ? list.map(function (t) {
+        var d = t.deletedAt ? new Date(t.deletedAt) : null;
+        return '&lt;div class="mb-note">&lt;div class="mb-tx" style="padding:0">' +
+          '&lt;div class="mb-tx-l">&lt;b>' + esc(t.description || t.notes || 'লেনদেন') + '&lt;/b>' +
+          '&lt;small>' + esc(dtxt(t.date)) + ' · ' + esc(t.accountName || '') + (d ? ' · মোছা: ' + d.toLocaleDateString('bn-BD', { day: '2-digit', month: 'short' }) : '') + '&lt;/small>&lt;/div>' +
+          '&lt;b class="' + (t.type === 'in' ? 'in' : 'out') + '">' + (t.type === 'in' ? '+' : '−') + F(t.amount) + '&lt;/b>&lt;/div>' +
+          '&lt;div class="mb-note-f">&lt;button class="mb-mini ok" data-restore="' + esc(t.id) + '" type="button">↩ ফিরিয়ে আনুন&lt;/button>' +
+          '&lt;button class="mb-mini del" data-purge="' + esc(t.id) + '" type="button">🗑 চিরতরে মুছুন&lt;/button>&lt;/div>&lt;/div>';
+      }).join('') : '&lt;p class="empty">ট্র্যাশ খালি&lt;/p>') + '&lt;/div>' +
+      (list.length ? '&lt;div class="mb-btns">&lt;button class="blue-btn mb-grey" id="mbTrashEmpty" type="button">সব চিরতরে মুছুন&lt;/button>&lt;/div>' : '');
+    $$('[data-restore]', body).forEach(function (b) {
+      b.onclick = function () {
+        var id = b.getAttribute('data-restore'), st = readState();
+        var rec = trash().filter(function (t) { return t.id === id; })[0];
+        if (!rec) return;
+        if (st.transactions.some(function (t) { return t.id === id; })) { alert('এই লেনদেন এখনো আছে।'); return; }
+        if (!st.accounts.some(function (a) { return a.id === rec.accountId; })) {
+          alert('যে অ্যাকাউন্টে ছিল সেটা আর নেই — আগে অ্যাকাউন্টটা বানান, তারপর ফেরান।');
+          return;
+        }
+        var clean = JSON.parse(JSON.stringify(rec));
+        delete clean.accountName; delete clean.deletedAt;
+        st.transactions.push(clean);
+        if (!saveState(st)) return;
+        saveTrash(trash().filter(function (t) { return t.id !== id; }));
+        alert('✅ লেনদেন ফিরিয়ে আনা হলো');
+        showScreen('home');
+        try { location.reload(); } catch (e) {}
+      };
+    });
+    $$('[data-purge]', body).forEach(function (b) {
+      b.onclick = function () {
+        if (!confirm('চিরতরে মুছে ফেলবেন? আর ফেরানো যাবে না।')) return;
+        saveTrash(trash().filter(function (t) { return t.id !== b.getAttribute('data-purge'); }));
+        RENDERS.mbTrash();
+      };
+    });
+    var em = $('#mbTrashEmpty');
+    if (em) em.onclick = function () {
+      if (!confirm('ট্র্যাশের সব লেনদেন চিরতরে মুছবেন?')) return;
+      saveTrash([]); RENDERS.mbTrash();
+    };
+  };
+
+  /* ---------------- ৯) সাহায্য ---------------- */
+  RENDERS.mbHelp = function () {
+    var body = $('#mbHelpBody');
+    body.innerHTML =
+      '&lt;div class="panel">&lt;h3 class="mb-h2">১) টাকা জমা/খরচ লিখবেন কীভাবে&lt;/h3>' +
+      '&lt;p class="hint">নিচে &lt;b>Cash In&lt;/b> চাপলে জমা, &lt;b>Cash Out&lt;/b> চাপলে খরচ। তারিখ-টাকা-বিবরণ লিখে &lt;b>Save and exit&lt;/b>।&lt;/p>' +
+      '&lt;h3 class="mb-h2">২) অ্যাকাউন্ট বদলাবেন কীভাবে&lt;/h3>' +
+      '&lt;p class="hint">উপরে অ্যাকাউন্টের নাম (▼) ছুঁলে তালিকা — সেখান থেকে বেছে নিন। নতুন অ্যাকাউন্ট ☰ → Accounts।&lt;/p>' +
+      '&lt;h3 class="mb-h2">৩) টাকা এক অ্যাকাউন্ট থেকে আরেকটায়&lt;/h3>' +
+      '&lt;p class="hint">☰ → Transfer — টাকা নিজে থেকেই দুই দিকে লেখা হয়ে যায়।&lt;/p>' +
+      '&lt;h3 class="mb-h2">৪) রিপোর্ট / PDF&lt;/h3>' +
+      '&lt;p class="hint">☰ → Report-All Accounts → &lt;b>PDF / প্রিন্ট&lt;/b>। ফোনের প্রিন্টারে “Save as PDF” বেছে নিন। Excel-এর জন্য CSV।&lt;/p>' +
+      '&lt;h3 class="mb-h2">৫) ব্যাকআপ&lt;/h3>' +
+      '&lt;p class="hint">☰ → Backup and Restore → &lt;b>.db&lt;/b> বা &lt;b>.json&lt;/b>। মাসে অন্তত একবার নিন। Google Drive-এ রাখতে Multi Business-এর হোমে &lt;b>🔼 আপলোড&lt;/b> চাপুন।&lt;/p>' +
+      '&lt;h3 class="mb-h2">৬) ভুলে কিছু মুছে ফেললে&lt;/h3>' +
+      '&lt;p class="hint">☰ → &lt;b>Deleted Transactions&lt;/b> — সেখানে সব মুছা লেনদেন জমা থাকে, ↩ চাপলেই ফিরে আসে।&lt;/p>' +
+      '&lt;h3 class="mb-h2">৭) হিসাব কোথায় থাকে&lt;/h3>' +
+      '&lt;p class="hint">আপনার নিজের ফোনেই (এই ফাইলের ভেতরে)। ইন্টারনেট ছাড়াই চলে, কোনো বিজ্ঞাপন নেই, কেউ দেখতে পায় না।&lt;/p>' +
+      '&lt;h3 class="mb-h2">৮) বড় করে দেখতে&lt;/h3>' +
+      '&lt;p class="hint">☰ → Settings → লেখার মাপ “বড়”, সংখ্যা “বাংলা”।&lt;/p>&lt;/div>';
+  };
+
+  /* ---------------- সেটিংস প্রয়োগ ---------------- */
+  var mo = null;
+  function convert(root) {
+    if (settings().digits !== 'bn') return;
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    var n, batch = [];
+    while ((n = w.nextNode())) {
+      var p = n.parentNode;
+      if (!p) continue;
+      var tag = p.tagName;
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'OPTION') continue;
+      if (/[0-9]/.test(n.nodeValue)) batch.push(n);
+    }
+    batch.forEach(function (t) { t.nodeValue = bnD(t.nodeValue); });
+  }
+  function applySettings() {
+    var s = settings();
+    try {
+      document.documentElement.style.fontSize = (s.fs / 100) * 16 + 'px';
+      document.body.setAttribute('data-mbcol', s.color);
+      document.body.classList.toggle('mb-notime', s.showTime === 'off');
+      document.body.classList.toggle('mb-bndigit', s.digits === 'bn');
+    } catch (e) {}
+    if (s.digits === 'bn') {
+      ['#entries', '.totals', '#periodLabel', '#inTotal', '#outTotal', '#balanceTotal'].forEach(function (sel) {
+        var el = $(sel); if (el) convert(el);
+      });
+      if (!mo) {
+        mo = new MutationObserver(function (muts) {
+          muts.forEach(function (m) {
+            if (m.type === 'childList' || m.type === 'characterData') {
+              var t = m.target.nodeType === 3 ? m.target.parentNode : m.target;
+              if (t &amp;&amp; !t.closest('.mb-screen')) convert(t.nodeType === 3 ? t.parentNode : t);
+              else if (t &amp;&amp; t.closest &amp;&amp; t.closest('.mb-screen')) convert(t);
+            }
+          });
+        });
+        mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+      }
+    }
+  }
+
+  /* ---------------- মেনুতে নতুন ঘর বসানো ---------------- */
+  function buildDrawer() {
+    var drawer = document.querySelector('.drawer');
+    if (!drawer || drawer.getAttribute('data-v36')) return;
+    drawer.setAttribute('data-v36', '1');
+
+    function item(id, sym, label, screenId) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.id = id;
+      b.innerHTML = '&lt;span class="sym">' + sym + '&lt;/span>' + esc(label);
+      b.onclick = function () { showScreen(screenId); };
+      return b;
+    }
+    var nav = function (sel) { return drawer.querySelector(sel); };
+    var bSummary = nav('[data-nav="summaryScreen"]');
+    var bAccounts = nav('[data-nav="accountsScreen"]');
+    var bTransfer = nav('[data-nav="transferScreen"]');
+    var bReport = nav('#menuReport');
+    var bCalc = nav('[data-nav="calculatorScreen"]');
+    var bBackup = nav('[data-nav="backupScreen"]');
+
+    var accSum = item('mbNavAccSum', '📊', 'Account Summary', 'mbAccSum');
+    var allTx = item('mbNavAllTx', '📋', 'Transaction-All Accounts', 'mbAllTx');
+    var names = item('mbNavNames', '🏷️', 'Transaction names', 'mbNames');
+    var note = item('mbNavNote', '📓', 'Notebook', 'mbNote');
+    var cal = item('mbNavCal', '📅', 'Calendar', 'mbCal');
+    var set = item('mbNavSet', '⚙️', 'Settings', 'mbSet');
+    var trashB = item('mbNavTrash', '🗑️', 'Deleted Transactions', 'mbTrash');
+    var help = item('mbNavHelp', '❓', 'Help', 'mbHelp');
+    var other = document.createElement('button');
+    other.type = 'button'; other.id = 'mbNavOther';
+    other.innerHTML = '&lt;span class="sym">🧩&lt;/span>Other Apps';
+
+    /* ক্রম: Summary · Account Summary · Transaction-All · Accounts · Transfer · Report-All ·
+       Transaction names · Notebook · Calendar · Cash Calculator · Backup · Settings · Deleted · Help · Other Apps */
+    function after(ref, node) { if (ref &amp;&amp; ref.parentNode) ref.parentNode.insertBefore(node, ref.nextSibling); else drawer.appendChild(node); }
+    if (bSummary) {
+      after(bSummary, accSum);
+      after(accSum, allTx);
+    }
+    if (bReport) {
+      after(bReport, names);
+      after(names, note);
+      after(note, cal);
+    }
+    if (bBackup) {
+      after(bBackup, set);
+      after(set, trashB);
+      after(trashB, help);
+      after(help, other);
+    } else {
+      drawer.appendChild(set); drawer.appendChild(trashB); drawer.appendChild(help); drawer.appendChild(other);
+    }
+    /* ▧ Report → এখন “Report-All Accounts” (সব অ্যাকাউন্টের রিপোর্ট একসাথে) */
+    if (bReport) {
+      bReport.innerHTML = '&lt;span class="sym">▧&lt;/span>Report-All Accounts';
+      bReport.onclick = function () { showScreen('mbRepAll'); };
+    }
+    other.onclick = function () {
+      var ov = $('#overlay'); if (ov) ov.classList.remove('open');
+      try {
+        var p = window.parent;
+        if (p &amp;&amp; p !== window &amp;&amp; p.document) {
+          var home = p.document.getElementById('barHome');
+          if (home) { home.click(); return; }
+          if (p.ComboApp &amp;&amp; p.ComboApp.home) { p.ComboApp.home(); return; }
+        }
+      } catch (e) {}
+      alert('Multi Business-এর উপরের “🏠 হোম” বোতামে চাপলে অন্য অ্যাপে যেতে পারবেন।');
+    };
+  }
+
+  /* ---------------- বানানো ও চালু ---------------- */
+  function build() {
+    var app = $('.app');
+    if (!app || document.getElementById('mbAccSum')) return;
+
+    var st = document.createElement('style');
+    st.id = 'mbExtrasCSS';
+    st.textContent = [
+      '.mb-screen{background:var(--bg)}',
+      '.mb-back,.mb-menu{font-size:22px}',
+      '.mb-screen .screen-title{font-size:18px;line-height:1.15}',
+      '.mb-screen .screen-title small{display:block;font-size:11.5px;font-weight:400;opacity:.9;margin-top:1px}',
+      '.mb-card{padding:12px;margin:0 0 12px;border-radius:12px}',
+      '.mb-total{border:2px solid #cfe3f5;background:#f6fbff}',
+      '.mb-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}',
+      '.mb-acc-name{font-weight:700;font-size:16px}',
+      '.mb-pill{background:#e6f2fb;color:#0a6aa8;border-radius:20px;padding:3px 10px;font-size:11.5px;white-space:nowrap}',
+      '.mb-row{display:flex;justify-content:space-between;gap:10px;padding:6px 2px;border-top:1px dashed #e3e8ec;font-size:14.5px}',
+      '.mb-row:first-of-type{border-top:0}',
+      '.mb-row b.in,.in{color:#0a7a35}.mb-row b.out,.out{color:#d21f2b}',
+      '.mb-list{border-radius:12px;margin-bottom:12px}',
+      '.mb-tx{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border-bottom:1px solid #eee;background:#fff}',
+      '.mb-tx:last-child{border-bottom:0}',
+      '.mb-tx-l{min-width:0;display:flex;flex-direction:column}',
+      '.mb-tx-l b{font-size:14.5px;overflow-wrap:anywhere}',
+      '.mb-tx-l small{color:#7b8794;font-size:11.5px;margin-top:2px}',
+      '.mb-tx>b{font-size:15px;white-space:nowrap}',
+      '.mb-tappable{cursor:pointer}.mb-tappable:active{background:#f0f6fb}',
+      '.mb-pair b{font-size:13px;margin-left:6px}',
+      '.mb-tools{display:flex;gap:8px;margin-bottom:10px}',
+      '.mb-sel{flex:0 0 45%}',
+      '.mb-tools .field{min-height:40px;padding:8px;font-size:14px;border:1px solid #ccc;border-radius:8px;background:#fff;width:100%}',
+      '.mb-btns{display:flex;gap:8px;margin:0 0 12px}',
+      '.mb-btns .blue-btn{flex:1;font-size:14px}',
+      '.mb-grey{background:#5b6b7a!important}',
+      '.mb-wide{width:100%;margin-top:8px}',
+      '.mb-h{font-size:15px;margin:14px 4px 8px;color:#2b3a46}',
+      '.mb-h2{font-size:14.5px;margin:12px 0 6px;color:#12384f}',
+      '.mb-note{background:#fff;padding:11px 12px;border-bottom:1px solid #eee}',
+      '.mb-note-t{font-size:14.5px;line-height:1.5;overflow-wrap:anywhere}',
+      '.mb-note-f{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px}',
+      '.mb-note-f small{color:#7b8794;font-size:11.5px}',
+      '.mb-mini{border-radius:8px;padding:7px 10px;font-size:12.5px;font-weight:700}',
+      '.mb-mini.ok{background:#e6f8ee;color:#0a7a35}.mb-mini.del{background:#fdeceb;color:#c31b26}',
+      '.mb-calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}',
+      '.mb-calhead b{font-size:16px}',
+      '.mb-nav{width:42px;height:38px;border-radius:9px;background:#e2eef7;color:#0a5178;font-size:20px;font-weight:700}',
+      '.mb-week{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px}',
+      '.mb-week span{text-align:center;font-size:11px;color:#5f6b76;font-weight:700}',
+      '.mb-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:12px}',
+      '.mb-cell{aspect-ratio:1/1;border-radius:9px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px;border:1px solid #e6ecf1}',
+      '.mb-cell .d{line-height:1}',
+      '.mb-cell.pos{background:#e9fbef;border-color:#bfe9cd}',
+      '.mb-cell.neg{background:#fdeeec;border-color:#f6cdc9}',
+      '.mb-cell.sel{outline:2px solid #0396ef;outline-offset:1px}',
+      '.mb-cell .dot{width:5px;height:5px;border-radius:50%;background:#7b8794}',
+      '.mb-cell.pos .dot{background:#17a84a}.mb-cell.neg .dot{background:#e0392b}',
+      '.mb-blank{background:transparent;border:0}',
+      '.mb-seg{display:flex;gap:6px;margin:4px 0 2px}',
+      '.mb-seg button{flex:1;padding:10px 6px;border-radius:9px;background:#eef2f5;color:#33424f;font-size:13.5px;font-weight:700}',
+      '.mb-seg button.on{background:#0396ef;color:#fff}',
+      'body[data-mbcol="green"]{--blue:#0e9f6e;--blueDark:#0b8a5f}',
+      'body[data-mbcol="dark"]{--blue:#25476b;--blueDark:#1c3852}',
+      'body.mb-notime .entry .meta{display:none}',
+      '#mbPrint{display:none}',
+      '#mbPrint h2{font-size:19px;margin:0 0 4px}#mbPrint h3{font-size:15px;margin:14px 0 6px}',
+      '#mbPrint table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:8px}',
+      '#mbPrint th,#mbPrint td{border:1px solid #bbb;padding:5px 6px;text-align:left}',
+      '#mbPrint thead th{background:#eef2f5}',
+      '#mbPrint .r{text-align:right}',
+      '@media print{',
+      ' body.mb-printing #home,body.mb-printing .mb-screen,body.mb-printing #overlay{display:none!important}',
+      ' body.mb-printing #mbPrint{display:block!important;padding:10px}',
+      ' body.mb-printing .bottom,body.mb-printing .notice{display:none!important}',
+      '}'
+    ].join('\n');
+    (document.head || document.documentElement).appendChild(st);
+
+    var printBox = document.createElement('div');
+    printBox.id = 'mbPrint';
+    document.body.appendChild(printBox);
+
+    var ov = $('#overlay');
+    var host = ov &amp;&amp; ov.parentNode ? ov : app;
+
+    var defs = [
+      ['mbAccSum', 'Account Summary', 'হিসাব সারসংক্ষেপ'],
+      ['mbAllTx', 'Transaction-All Accounts', 'সব অ্যাকাউন্টের লেনদেন'],
+      ['mbRepAll', 'Report-All Accounts', 'সব অ্যাকাউন্টের রিপোর্ট'],
+      ['mbNames', 'Transaction names', 'লেনদেনের নাম'],
+      ['mbNote', 'Notebook', 'নোটবুক'],
+      ['mbCal', 'Calendar', 'ক্যালেন্ডার'],
+      ['mbSet', 'Settings', 'সেটিংস'],
+      ['mbTrash', 'Deleted Transactions', 'মুছে ফেলা লেনদেন'],
+      ['mbHelp', 'Help', 'সাহায্য']
+    ];
+    defs.forEach(function (d) {
+      var sec = mkScreen(d[0], d[1], d[2]);
+      if (host === app) app.appendChild(sec); else host.parentNode.insertBefore(sec, host);
+    });
+    $$('.mb-back').forEach(function (b) { b.onclick = function () { showScreen('home'); }; });
+    $$('.mb-menu').forEach(function (b) { b.onclick = function () { var o = $('#overlay'); if (o) o.classList.add('open'); }; });
+
+    buildDrawer();
+    applySettings();
+  }
+
+  /* অ্যাপ পুরো তৈরি হওয়ার পর বসাই (অ্যাপের স্ক্রিপ্ট শেষে render() চালায়) */
+  function boot() {
+    build();
+    var home = document.getElementById('home');
+    if (home &amp;&amp; !home.getAttribute('data-v36')) {
+      home.setAttribute('data-v36', '1');
+      var obs = new MutationObserver(function () { applySettings(); });
+      var entries = document.getElementById('entries');
+      if (entries) obs.observe(entries, { childList: true, subtree: true, characterData: true });
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(boot, 60); });
+  else setTimeout(boot, 60);
+  setTimeout(boot, 350);   /* অ্যাপ নিজে render() করার পরও একবার */
+
+  window.__mbExtras = { show: showScreen, settings: settings, apply: applySettings, trash: trash, notes: notes };
+})();
+
+&lt;/script>
 &lt;/body>&lt;/html>
 </template>
 
@@ -10776,5 +11586,5 @@ $('#menuBtn').onclick=()=>$('#overlay').classList.add('open');$('#overlay').oncl
 })();
 
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a542913d7f7b311c',t:'MTc5MzYxNjUxMQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a542913d7f7b311c',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
